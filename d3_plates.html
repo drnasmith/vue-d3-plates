@@ -60,7 +60,7 @@
 <script>
 
 Vue.component('plate-view', {
-    template: '<div><ul><li class="inline" v-for="i in selected">{{i}}, </li></ul><div id="plate" class="mt-3 border border-green-500"></div></div>',
+    template: '<div><p v-show="selected.length">Selected Samples:</p><ul><li class="inline" v-for="i in selected">{{i}}, </li></ul><div id="plate" class="mt-3 border border-green-500"></div></div>',
     props: [ 'container', 'samples', 'rows', 'color-scale', 'threshold' ], // color-scale mapped to colorScale
     data: function() {
         return {
@@ -264,7 +264,7 @@ Vue.component('plate-view', {
                     let index = self.selected.indexOf(sampleId)
 
                     if ( index < 0) {
-                        d3.select(this).style('stroke', 'green').style('stroke-width', 2)
+                        d3.select(this).style('stroke', 'steelblue').style('stroke-width', 2)
                         self.selected.push(sampleId)
                     } else {
                         d3.select(this).style('stroke', 'gray').style('stroke-width', 1)
@@ -279,6 +279,7 @@ Vue.component('plate-view', {
                 .attr('y', (d,i) => { return self.dropCoords[i].y + self.dropHeight*0.7*self.container.drops.h })
                 .html((d) => { return d.SCORE})
                 .style('fill', 'darkgray')
+                .style("pointer-events","none") // Required to capture mouse events on non-fill shapes
                 
             })
       },
