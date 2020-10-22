@@ -1,48 +1,67 @@
+<!DOCTYPE html>
 <html>
     <head>
         <title>d3 visualisations with Vue</title>
         <link href="tailwind.min.css" rel="stylesheet">
         <script src="vue.js"></script>
         <script src="d3.min.js"></script>
+        <meta lang="en" charset="utf-8"/>
     </head>
     <body>
         <div id="app" class="container mx-auto">
-            <h1 class="text-2xl">
+            <h1 class="text-2xl text-center">
                 Vue.js, d3.js and tailwind CSS Sample Group selection demo
             </h1>
             <div class="mb-4">
+                <h1 class="text-xl">Sample Group</h1>
                 <input class="border rounded shadow px-2 py-1" type="text" placeholder="Sample Group Name" v-model="sampleGroupName"/>
-                <button class="border rounded px-2 py-1 bg-blue-400 hover:bg-blue-600 text-white" @click="onSave" type="submit">Save</button>    
+                <button class="border rounded px-2 py-1 bg-blue-400 hover:bg-blue-600 text-white" v-on:click="onSave" type="submit">Save</button>    
             </div>
             <div class="mb-4">
+                <h1 class="text-xl">Plate Geometry</h1>
                 <label class="">Capacity</label>
-                <input v-model="container.capacity" class="border rounded shadow px-2 py-1" type="number"/>    
+                <input v-model="container.capacity" class="border rounded shadow px-2" type="number"/>    
                 <label>Rows</label>
-                <input v-model="container.rows" class="border rounded shadow px-2 py-1" type="number"/>
+                <input v-model="container.rows" class="border rounded shadow px-2" type="number"/>
             </div>
             <div class="mb-4">
                 <label class="">Drops X</label>
-                <input v-model="container.drops.x" class="border rounded shadow px-2 py-1" type="number"/>
+                <input v-model="container.drops.x" class="border rounded shadow px-2" type="number"/>
                 <label class="">Drops Y</label>
-                <input v-model="container.drops.y" class="border rounded shadow px-2 py-1" type="number"/>
+                <input v-model="container.drops.y" class="border rounded shadow px-2" type="number"/>
                 <label class="">Drop Width</label>
-                <input v-model="container.drops.w" class="border rounded shadow px-2 py-1" type="number" max="1" min="0"/>
+                <input v-model="container.drops.w" class="border rounded shadow px-2" type="number" max="1" min="0"/>
                 <label class="">Drop Height</label>
-                <input v-model="container.drops.h" class="border rounded shadow px-2 py-1" type="number" max="1" min="0"/>
+                <input v-model="container.drops.h" class="border rounded shadow px-2" type="number" max="1" min="0"/>
             </div>
             <div class="mb-4">
-                <button class="border rounded px-2 py-1 bg-blue-400 hover:bg-blue-600 text-white" @click="updatePlateView" type="submit">Update Plate Geometry</button>    
+                <button class="border rounded px-2 py-1 bg-blue-400 hover:bg-blue-600 text-white" @click="updatePlateView" type="submit">Update Plate Geometry </button>
             </div>
+            <div class="mb-4">
+                <h1 class="text-xl">Scoring Color Schemes</h1>
+                <label>Color Scale</label>
+                <select v-model="colorScale" class="border rounded shadow px-2">
+                    <option value="viridis">Viridis</option>
+                    <option value="rgb">RGB</option>
+                    <option value="threshold">Threshold</option>
+                </select>
+                <div v-if="colorScale == 'threshold'">
+                    <!-- <label>Threshold Value: </label><input v-model="threshold" class="border rounded shadow px-2" /> -->
+                    <label>Threshold Value: </label><input v-model="threshold" class="align-bottom" type="range" min="0" max="100" class="slider" id="myRange">
+                    <div><p>Threshold: {{threshold}}%</p></div>
+                </div>
+            </div>
+
             <!-- <div id="plate" class="mt-3 border border-green-500"></div> -->
-            <plate-view :container="container" :samples="samples.data" :key="plateKey"></plate-view>
+            <plate-view :container="container" :samples="samples.data" :threshold="threshold/100" :color-scale="colorScale" :key="plateKey"></plate-view>
         </div>
     </body>
 
 <script>
 
 Vue.component('plate-view', {
-    template: '<div><div class="mb-4"><label class="">Use Viridis</label><input type="checkbox" name="viridis" value="Viridis" v-model="useViridis"></div><ul><li class="inline" v-for="i in selected">{{i}}, </li></ul><div id="plate" class="mt-3 border border-green-500"></div></div>',
-    props: [ 'container', 'samples', 'rows' ],
+    template: '<div><ul><li class="inline" v-for="i in selected">{{i}}, </li></ul><div id="plate" class="mt-3 border border-green-500"></div></div>',
+    props: [ 'container', 'samples', 'rows', 'color-scale', 'threshold' ], // color-scale mapped to colorScale
     data: function() {
         return {
             selected: [],
@@ -52,7 +71,6 @@ Vue.component('plate-view', {
                 padding: 4, // Padding within each cell
                 margin: 10, // Spacing between wells in graphic
             },
-            useViridis: true,
         }
     },
     computed: {
@@ -209,7 +227,6 @@ Vue.component('plate-view', {
       // i in the column index,
       drawRow: function(selection, i) {
         let self = this
-        console.log("DRAW ROW")
 
         // Draw the cell/well boundary
         selection
@@ -238,13 +255,11 @@ Vue.component('plate-view', {
                 .attr('height', self.dropHeight*self.container.drops.h)
                 // .style('fill', 'none')
                 .style('stroke', 'gray')
-                .style('fill', (d,i) => { return self.viridisScale(d, i) })
+                .style('fill', (d) => { return self.scoreColors(d) })
                 .style("pointer-events","visible") // Required to capture mouse events on non-fill shapes
                 .on("click", function() {
                     let sampleId = d3.select(this).data()[0].BLSAMPLEID
                     if (sampleId === undefined) return
-
-                    console.log("Selected: " + sampleId)
 
                     let index = self.selected.indexOf(sampleId)
 
@@ -256,17 +271,72 @@ Vue.component('plate-view', {
                         self.selected.splice(index, 1)
                     }
                 })
+                d3.select(this).selectAll('text')
+                .data(d)
+                .enter()
+                .append('text')
+                .attr('x', (d,i) => { return self.dropCoords[i].x + self.dropWidth*0.2*self.container.drops.w })
+                .attr('y', (d,i) => { return self.dropCoords[i].y + self.dropHeight*0.7*self.container.drops.h })
+                .html((d) => { return d.SCORE})
+                .style('fill', 'darkgray')
+                
             })
       },
+      scoreColors: function(d) {
+        let color = 'none'
+        switch(this.colorScale) {
+            case 'rgb':
+                color = this.rgbScale(d)
+                break
+            case 'viridis':
+                color = this.viridisScale(d)
+                break
+            case 'threshold':
+                color = this.quantScale(d)
+                break
+            default:
+                color = this.rgbScale(d)
+                break
+        }
+        return color
+      },
+      quantScale: function(d) {
+        let color = 'none'
 
-      viridisScale: function(d, i) {
-        console.log("VIRIDIS SCALE " + JSON.stringify(d) + ", " + i)
-          if (this.useViridis) {
-            let score = d.SCORE || 'gray'
-            return d3.interpolateViridis(score) 
-          } else {
-              return 'none'
-          }
+        var myColor = d3.scaleThreshold()
+            .domain([0,this.threshold, 1])
+            .range(["lightgray", "lightgray", "green"])
+        
+        let score = d.SCORE || null
+
+        if (score) {
+            color = myColor(score)
+        }
+
+        return color
+      },
+      rgbScale: function(d) {
+        let color = 'none'
+        // Option 1: give 2 color names
+        var myColor = d3.scaleLinear()
+            .domain([0,1])
+            .range(["red", "green"])
+        
+        let score = d.SCORE || null
+
+        if (score)
+            color = myColor(score)
+
+        return color
+      },
+      viridisScale: function(d) {
+        let color = 'none'
+    
+        let score = d.SCORE || null
+    
+        if (score) color = d3.interpolateViridis(score)
+
+        return color
       },
     }
 
@@ -283,6 +353,14 @@ var app = new Vue({
           alert("Saving Sample Group: " + this.sampleGroupName)
       }
   },
+  watch: {
+    threshold: function(val) {
+        this.updatePlateView()
+    },
+    colorScale: function(val) {
+      this.updatePlateView()  
+     },
+  },
   data: {
     sampleGroupName: '',
     plateKey: 0,
@@ -292,6 +370,8 @@ var app = new Vue({
         drops: {x: 2, y: 1, h: 0.5, w: 1}, // Try x,y with a width factor
         well: 2
     },
+    threshold: 50, // Above number show as green (x10 for range slider)
+    colorScale: 'rgb', // 'viridis', rgb', 'threshold'
     samples: {
     "total": 20,
     "data": [
@@ -363,7 +443,7 @@ var app = new Vue({
             "RADIATIONSENSITIVITY": null,
             "ENERGY": null,
             "USERPATH": null,
-            "SCORE": 0.9
+            "SCORE": 1.0
         },
         {
             "BLSAMPLEID": "499094",
@@ -643,7 +723,7 @@ var app = new Vue({
             "RADIATIONSENSITIVITY": null,
             "ENERGY": null,
             "USERPATH": null,
-            "SCORE": 0.1
+            "SCORE": 0.4
         },
         {
             "BLSAMPLEID": "399098",
@@ -853,7 +933,7 @@ var app = new Vue({
             "RADIATIONSENSITIVITY": null,
             "ENERGY": null,
             "USERPATH": null,
-            "SCORE": 0.1
+            "SCORE": 0.3
         },
         {
             "BLSAMPLEID": "399101",
