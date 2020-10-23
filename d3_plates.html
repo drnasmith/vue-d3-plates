@@ -13,6 +13,17 @@
                 Vue.js, d3.js and tailwind CSS Sample Group selection demo
             </h1>
             <div class="mb-4">
+                <h1 class="text-xl">Description</h1>
+                <div class="ml-4">
+                    <p>This demo combines a couple of things.</p>
+                    <p>Use of SVG to draw plates, edit the plate geometry and click "Update Plate Geometry" to see changes.</p>
+                    <p>Drop width and height are scaling factors 0-1 to accurately reflect different plate types).</p>
+                    <p>Clicking on each cell shows how we could add sample to a SampleGroup. Selected sample ids shown above the plate view.</p>
+                    <p>Changing the colour scale demonstrates the use of different filters (viridis, rgb, threshold).</p>
+                    <p>Threshold is shown as a percentage and filters "scores" from 0.0 - 1.0 (100%).</p>    
+                </div>
+            </div>
+            <div class="mb-4">
                 <h1 class="text-xl">Sample Group</h1>
                 <input class="border rounded shadow px-2 py-1" type="text" placeholder="Sample Group Name" v-model="sampleGroupName"/>
                 <button class="border rounded px-2 py-1 bg-blue-400 hover:bg-blue-600 text-white" v-on:click="onSave" type="submit">Save</button>    
@@ -52,7 +63,6 @@
                 </div>
             </div>
 
-            <!-- <div id="plate" class="mt-3 border border-green-500"></div> -->
             <plate-view :container="container" :samples="samples.data" :threshold="threshold/100" :color-scale="colorScale" :key="plateKey"></plate-view>
         </div>
     </body>
@@ -61,7 +71,7 @@
 
 Vue.component('plate-view', {
     template: '<div><p v-show="selected.length">Selected Samples:</p><ul><li class="inline" v-for="i in selected">{{i}}, </li></ul><div id="plate" class="mt-3 border border-green-500"></div></div>',
-    props: [ 'container', 'samples', 'rows', 'color-scale', 'threshold' ], // color-scale mapped to colorScale
+    props: [ 'container', 'samples', 'color-scale', 'threshold' ], // color-scale mapped to colorScale
     data: function() {
         return {
             selected: [],
