@@ -275,9 +275,12 @@ Vue.component('plate-view', {
                 .data(d)
                 .enter()
                 .append('text')
-                .attr('x', (d,i) => { return self.dropCoords[i].x + self.dropWidth*0.2*self.container.drops.w })
-                .attr('y', (d,i) => { return self.dropCoords[i].y + self.dropHeight*0.7*self.container.drops.h })
-                .html((d) => { return d.SCORE})
+                .attr('x', (d,i) => { return self.dropCoords[i].x + self.dropWidth*0.5*self.container.drops.w })
+                .attr('y', (d,i) => { return self.dropCoords[i].y + self.dropHeight*0.5*self.container.drops.h })
+                .html((d) => { return d.SCORE ? d3.format(".1f")(d.SCORE) : ''})
+                .attr('text-anchor', 'middle')
+                .attr('dominant-baseline', 'middle')
+                .style('font-size', '10px')
                 .style('fill', 'darkgray')
                 .style("pointer-events","none") // Required to capture mouse events on non-fill shapes
                 
