@@ -2,9 +2,17 @@
 <html>
     <head>
         <title>d3 visualisations with Vue</title>
-        <link href="tailwind.min.css" rel="stylesheet">
-        <script src="vue.js"></script>
-        <script src="d3.min.js"></script>
+        <!-- 
+            Download tailwind, vue and d3 locally or via CDN
+         -->
+        <!-- 
+            <link href="tailwind.min.css" rel="stylesheet">
+            <script src="vue.js"></script>
+            <script src="d3.min.js"></script> 
+        -->
+        <link href="https://unpkg.com/tailwindcss@^1.0/dist/tailwind.min.css" rel="stylesheet">
+        <script src="https://unpkg.com/vue@2.6.12/dist/vue.js"></script>
+        <script src="https://unpkg.com/d3@6.2.0/dist/d3.min.js"></script>
         <meta lang="en" charset="utf-8"/>
     </head>
     <body>
@@ -23,11 +31,11 @@
                     <p>Threshold is shown as a percentage and filters "scores" from 0.0 - 1.0 (100%).</p>    
                 </div>
             </div>
-            <div class="mb-4">
+            <!-- <div class="mb-4">
                 <h1 class="text-xl">Sample Group</h1>
                 <input class="border rounded shadow px-2 py-1" type="text" placeholder="Sample Group Name" v-model="sampleGroupName"/>
                 <button class="border rounded px-2 py-1 bg-blue-400 hover:bg-blue-600 text-white" v-on:click="onSave" type="submit">Save</button>    
-            </div>
+            </div> -->
             <div class="mb-4">
                 <h1 class="text-xl">Plate Geometry</h1>
                 <label class="">Capacity</label>
@@ -64,6 +72,7 @@
             </div>
 
             <plate-view :container="container" :samples="samples.data" :threshold="threshold/100" :color-scale="colorScale" :key="plateKey"></plate-view>
+            <puck-view :samples="samples.data" :threshold="threshold/100" :color-scale="colorScale" :key="puckKey"></plate-view>
         </div>
     </body>
 
@@ -356,6 +365,215 @@ Vue.component('plate-view', {
 
 })
 
+Vue.component('puck-view', {
+    template: '<div><p v-show="selected.length">Selected Samples:</p><ul><li class="inline" v-for="i in selected">{{i}}, </li></ul><div id="puck" class="mt-3 border border-green-500"></div></div>',
+    props: [ 'container', 'samples', 'color-scale', 'threshold' ], // color-scale mapped to colorScale
+    data: function() {
+        return {
+            selected: [],
+            cell: {
+                outerRadius: 45,
+                radius: 30,
+                padding: 4, // Padding within each cell
+                margin: 10, // Spacing between wells in graphic
+            },
+            // Centre coordinates of puck 470x470 pixels
+            // Changing the background image would require changing the centres
+            centres: [
+                [234, 157],
+                [158, 213],
+                [188, 301],
+                [281, 300],
+                [310, 211],
+                [234, 62],
+                [140, 91],
+                [76, 165],
+                [63, 263],
+                [101, 349],
+                [186, 401],
+                [283, 402],
+                [367, 350],
+                [406, 261],
+                [393, 163],
+                [329, 92],
+            ],
+            puckImage: 'puck_no_labels_470x470.png',
+            graphic: null, // Holder for svg puck graphic
+            labels: null, // Holder for text labels
+        }
+    },
+    computed: {
+      preparedData: function() {
+        // Firstly create an array of length == capacity of container
+        let samples = Array.from({length: this.centres.length}, (v,i) => { return {} })
+
+        // Now fill in location with sample data at that location
+        for (var i=0; i<this.samples.length; i++) {
+            let location = this.samples[i].LOCATION || null
+            console.log("Found sample in LOCATION: " + location)
+            // Not quite right - need to add as an array for consistency
+            if (location) samples[location-1] = this.samples[i]
+        }
+
+        return samples;
+      }
+    },
+    mounted: function() {
+        this.drawContainer()
+  },
+  methods: {
+      drawContainer: function() {
+          // For the puck we have no need for a label
+          // In fact we keep the graphic as the same size as svg to map a background image
+          const viewBoxWidth = 1000
+          const viewBoxHeight = 1000
+
+          const viewBox = [0,0,viewBoxWidth,viewBoxHeight]
+
+          // Make the svg fit within a viewport
+          const svg = d3.select('#puck')
+            .append('svg')
+            .attr('viewBox', viewBox.join(','))
+            .attr('preserveAspectRatio', 'xMaxYMax meet')
+
+          const img = svg.append('image')
+            .attr('href', this.puckImage)
+            .attr('width', 470)
+            .attr('height', 470)    
+
+          // Chart area
+          this.graphic = svg.append('g')
+          this.labels = svg.append('g')
+
+          // This keyword gets used for d3 selection in 'each' method
+          let self = this
+
+          // This part is entirely optional
+          // It just exists to blend the boundaries between the image and the circles
+          let circleBoundaries = this.graphic.selectAll('.borders')
+            .data(this.centres)
+            .enter()
+            .append('circle')
+                .attr('class', 'borders')
+                .attr('r', this.cell.outerRadius)
+                .attr('cx', (d) => { return d[0]})
+                .attr('cy', (d) => { return d[1]})
+                .style('fill', 'none')
+                .style('stroke', '#666')
+                .style('stroke-width', 4)
+                .style("pointer-events","none") // Required to capture mouse events on non-fill shapes
+
+
+          let circles = this.graphic.selectAll('.positions')
+            .data(this.centres)
+            .enter()
+            .append('circle')
+                .attr('class', 'positions')
+                .attr('r', this.cell.radius)
+                .attr('cx', (d) => { return d[0]})
+                .attr('cy', (d) => { return d[1]})
+                .style('fill', 'none')
+                .style('stroke', 'none')
+                .style("pointer-events","visible") // Required to capture mouse events on non-fill shapes
+                .on("click", function() {
+                    let sample = d3.select(this)
+                    .style('fill', 'steelblue')
+                })
+                .on("mouseover", function() {
+                    let sample = d3.select(this)
+                    console.log("Mouse Hover")
+                    sample.style('stroke', 'steelblue')
+                })
+                .on("mouseleave", function() {
+                    let sample = d3.select(this)
+                    console.log("Mouse Leave")
+                    sample.style('stroke', 'none')
+                })
+
+        this.showLabels()
+      },
+
+      showLabels: function() {
+          this.labels.selectAll('.label')
+          .data(this.centres)
+                .enter()
+                .append('text')
+                .html( (d,i) => { return i+1 })
+                .attr('x', (d,i) => {return d[0]})
+                .attr('y', (d,i) => { return d[1]})
+                .attr('text-anchor', 'middle')
+                .attr('dominant-baseline', 'middle')
+                .attr('class', 'label')
+                .style("pointer-events","none") // Required to capture mouse events on non-fill shapes
+      },
+
+      removeLabels: function() {
+        this.labels.selectAll('.label')
+            .data([])
+            .exit()
+            .remove()
+      },
+
+      scoreColors: function(d) {
+        let color = 'none'
+        switch(this.colorScale) {
+            case 'rgb':
+                color = this.rgbScale(d)
+                break
+            case 'viridis':
+                color = this.viridisScale(d)
+                break
+            case 'threshold':
+                color = this.quantScale(d)
+                break
+            default:
+                color = this.rgbScale(d)
+                break
+        }
+        return color
+      },
+      quantScale: function(d) {
+        let color = 'none'
+
+        var myColor = d3.scaleThreshold()
+            .domain([0,this.threshold, 1])
+            .range(["lightgray", "lightgray", "green"])
+        
+        let score = d.SCORE || null
+
+        if (score) {
+            color = myColor(score)
+        }
+
+        return color
+      },
+      rgbScale: function(d) {
+        let color = 'none'
+        // Option 1: give 2 color names
+        var myColor = d3.scaleLinear()
+            .domain([0,1])
+            .range(["red", "green"])
+        
+        let score = d.SCORE || null
+
+        if (score)
+            color = myColor(score)
+
+        return color
+      },
+      viridisScale: function(d) {
+        let color = 'none'
+    
+        let score = d.SCORE || null
+    
+        if (score) color = d3.interpolateViridis(score)
+
+        return color
+      },
+    }
+
+})
+
 var app = new Vue({
   el: '#app',
   methods: {
@@ -378,6 +596,7 @@ var app = new Vue({
   data: {
     sampleGroupName: '',
     plateKey: 0,
+    puckKey: 0,
     container: {
         capacity: 192,
         rows: 8,
